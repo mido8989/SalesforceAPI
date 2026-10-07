@@ -43,5 +43,12 @@ private class IF_AccountSender_Test {
         Assert.areEqual('Interface Test Account', (String) sent.get('name'));
         Assert.areEqual('Technology', (String) sent.get('industry'));
         Assert.isNotNull(sent.get('createdDate'));
+
+        // The call should also have been recorded in the interface log.
+        List<IF_Log__c> logs = [SELECT Interface__c, Status__c, RecordCount__c FROM IF_Log__c];
+        Assert.areEqual(1, logs.size());
+        Assert.areEqual('IF_AccountSender', logs[0].Interface__c);
+        Assert.areEqual('Success', logs[0].Status__c);
+        Assert.areEqual(1, logs[0].RecordCount__c.intValue());
     }
 }

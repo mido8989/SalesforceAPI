@@ -23,34 +23,84 @@ private class IF_Callout_Test {
         }
     }
 
+    /** Pretends the other system cannot be reached at all. */
+    public class NoAnswerMock implements HttpCalloutMock {
+        public HttpResponse respond(HttpRequest request) {
+            CalloutException e = new CalloutException();
+            e.setMessage('Read timed out');
+            throw e;
+        }
+    }
+
+    /** Reads the log written by the call, and checks there is exactly one. */
+    private static IF_Log__c onlyLog() {
+        List<IF_Log__c> logs = [
+            SELECT Interface__c, Status__c, StatusCode__c, RecordCount__c,
+                   Endpoint__c, RequestBody__c, Message__c
+            FROM IF_Log__c
+        ];
+        Assert.areEqual(1, logs.size(), 'Exactly one log record is expected');
+        return logs[0];
+    }
+
     @IsTest
-    static void postJsonSendsTheRequestAndReturnsTheResponse() {
+    static void aSuccessfulCallIsSentAndLogged() {
         FixedStatusMock mock = new FixedStatusMock(200);
         Test.setMock(HttpCalloutMock.class, mock);
 
         Test.startTest();
-        HttpResponse response = IF_Callout.postJson(
-            'Lead_Form_Web', '/api/test', new Map<String, Object>{ 'hello' => 'world' });
+        IF_Callout.Result result = IF_Callout.postJson(
+            'IF_Test', 'Lead_Form_Web', '/api/test',
+            new Map<String, Object>{ 'hello' => 'world' }, 1);
         Test.stopTest();
 
-        Assert.areEqual(200, response.getStatusCode());
+        Assert.isTrue(result.success);
+        Assert.areEqual(200, result.statusCode);
         Assert.areEqual('callout:Lead_Form_Web/api/test', mock.lastRequest.getEndpoint());
         Assert.areEqual('POST', mock.lastRequest.getMethod());
-        Assert.areEqual('application/json', mock.lastRequest.getHeader('Content-Type'));
-        Assert.isTrue(mock.lastRequest.getBody().contains('"hello":"world"'));
+
+        IF_Log__c log = onlyLog();
+        Assert.areEqual('IF_Test', log.Interface__c);
+        Assert.areEqual('Success', log.Status__c);
+        Assert.areEqual(200, log.StatusCode__c.intValue());
+        Assert.areEqual(1, log.RecordCount__c.intValue());
+        Assert.areEqual('callout:Lead_Form_Web/api/test', log.Endpoint__c);
+        Assert.isTrue(log.RequestBody__c.contains('"hello":"world"'));
     }
 
     @IsTest
-    static void postJsonRaisesAnErrorWhenTheOtherSystemFails() {
+    static void anErrorAnswerIsLoggedAsFailed() {
         Test.setMock(HttpCalloutMock.class, new FixedStatusMock(500));
 
         Test.startTest();
-        try {
-            IF_Callout.postJson('Lead_Form_Web', '/api/test', new Map<String, Object>());
-            Assert.fail('An error was expected');
-        } catch (IF_Callout.CalloutFailedException e) {
-            Assert.isTrue(e.getMessage().contains('500'));
-        }
+        IF_Callout.Result result = IF_Callout.postJson(
+            'IF_Test', 'Lead_Form_Web', '/api/test', new Map<String, Object>(), 0);
         Test.stopTest();
+
+        Assert.isFalse(result.success);
+        Assert.areEqual(500, result.statusCode);
+
+        IF_Log__c log = onlyLog();
+        Assert.areEqual('Failed', log.Status__c);
+        Assert.areEqual(500, log.StatusCode__c.intValue());
+        Assert.isTrue(log.Message__c.contains('500'));
+    }
+
+    @IsTest
+    static void noAnswerAtAllIsLoggedAsFailed() {
+        Test.setMock(HttpCalloutMock.class, new NoAnswerMock());
+
+        Test.startTest();
+        IF_Callout.Result result = IF_Callout.postJson(
+            'IF_Test', 'Lead_Form_Web', '/api/test', new Map<String, Object>(), 0);
+        Test.stopTest();
+
+        Assert.isFalse(result.success);
+        Assert.isNull(result.statusCode);
+
+        IF_Log__c log = onlyLog();
+        Assert.areEqual('Failed', log.Status__c);
+        Assert.isNull(log.StatusCode__c);
+        Assert.isTrue(log.Message__c.contains('timed out'));
     }
 }
