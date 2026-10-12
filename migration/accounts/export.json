@@ -1,0 +1,9 @@
+{
+  "objects": [
+    {
+      "query": "SELECT Name, Industry, SAP_Customer_Code__c, PlantCode__c FROM Account WHERE PlantCode__c = 'Daesan'",
+      "operation": "Upsert",
+      "externalId": "SAP_Customer_Code__c"
+    }
+  ]
+}

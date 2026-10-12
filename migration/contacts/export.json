@@ -1,0 +1,14 @@
+{
+  "objects": [
+    {
+      "query": "SELECT SAP_Customer_Code__c FROM Account WHERE PlantCode__c = 'Daesan'",
+      "operation": "Readonly",
+      "externalId": "SAP_Customer_Code__c"
+    },
+    {
+      "query": "SELECT FirstName, LastName, Email, Phone, AccountId, Legacy_Id__c FROM Contact WHERE Account.PlantCode__c = 'Daesan'",
+      "operation": "Upsert",
+      "externalId": "Legacy_Id__c"
+    }
+  ]
+}
