@@ -4,6 +4,11 @@
  */
 trigger AccountTrigger on Account (after insert, after update) {
 
+    // Migration switch: if bypass is on for this user, do nothing.      
+    if (Integration_Settings__c.getInstance().Bypass_Triggers__c) {     
+        return;                                                          
+    }
+
     // Start one background job for all Accounts in this save,
     // as long as Salesforce still allows another job in this transaction.
     if (Limits.getQueueableJobs() < Limits.getLimitQueueableJobs()) {
